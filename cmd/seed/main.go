@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -9,31 +10,36 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"github.com/mytheresa/go-hiring-challenge/app/database"
+	"github.com/david-t-01/go-catalog-product-project/app/database"
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
 	// Load environment variables from .env file
 	if err := godotenv.Load(".env"); err != nil {
-		log.Fatalf("Error loading .env file: %s", err)
+		return fmt.Errorf("loading .env file: %w", err)
 	}
 
 	// Initialize database connection
-	db, close := database.New(
+	db, closeDB := database.New(
 		os.Getenv("POSTGRES_USER"),
 		os.Getenv("POSTGRES_PASSWORD"),
 		os.Getenv("POSTGRES_DB"),
 		os.Getenv("POSTGRES_PORT"),
 	)
-	defer close()
+	defer func() { _ = closeDB() }()
 
 	dir := os.Getenv("POSTGRES_SQL_DIR")
 	files, err := os.ReadDir(dir)
 	if err != nil {
-		log.Fatalf("reading directory failed: %v", err)
+		return fmt.Errorf("reading directory: %w", err)
 	}
 
-	// Filter and sort .sql files
 	var sqlFiles []os.DirEntry
 	for _, file := range files {
 		if !file.IsDir() && strings.HasSuffix(file.Name(), ".sql") {
@@ -54,10 +60,10 @@ func main() {
 
 		sql := string(content)
 		if err := db.Exec(sql).Error; err != nil {
-			log.Printf("executing %s failed: %v", file.Name(), err)
-			return
+			return fmt.Errorf("executing %s: %w", file.Name(), err)
 		}
 
 		log.Printf("Executed %s successfully\n", file.Name())
 	}
+	return nil
 }

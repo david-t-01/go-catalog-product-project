@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"log"
 
-	_ "github.com/lib/pq"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-func New(user, password, dbname, port string) (db *gorm.DB, close func() error) {
+func New(user, password, dbname, port string) (db *gorm.DB, closeDB func() error) {
 	dsn := fmt.Sprintf("postgres://%s:%s@localhost:%s/%s?sslmode=disable", user, password, port, dbname)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
