@@ -1,0 +1,7 @@
+.git
+vendor
+coverage.out
+docs
+postman
+.env
+*.md

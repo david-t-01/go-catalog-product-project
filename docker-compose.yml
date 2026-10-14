@@ -8,7 +8,26 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: pg_isready
+      test: ["CMD-SHELL", "pg_isready -U postgres -d challenge"]
       interval: 5s
       timeout: 5s
       retries: 5
+
+  api:
+    build: .
+    image: go-catalog-api
+    profiles: ["app"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      POSTGRES_HOST: postgres
+    ports:
+      - "${HTTP_PORT}:${HTTP_PORT}"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:${HTTP_PORT}/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
