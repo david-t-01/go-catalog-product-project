@@ -1,0 +1,15 @@
+template: testify
+dir: "{{.InterfaceDir}}/mocks"
+pkgname: mocks
+filename: "{{.InterfaceName | snakecase}}.go"
+structname: "Mock{{.InterfaceName}}"
+force-file-write: true
+packages:
+  github.com/david-t-01/go-catalog-product-project/app/catalog:
+    interfaces:
+      ProductsRepository: {}
+      Catalog: {}
+  github.com/david-t-01/go-catalog-product-project/app/categories:
+    interfaces:
+      Repository: {}
+      Categories: {}
