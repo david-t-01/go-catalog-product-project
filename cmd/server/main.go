@@ -24,16 +24,15 @@ import (
 const shutdownTimeout = 10 * time.Second
 
 func main() {
-	if err := run(); err != nil {
-		slog.Error("server", "err", err)
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	if err := run(logger); err != nil {
+		logger.Error("server", "err", err)
 		os.Exit(1)
 	}
 }
 
 // run holds every defer so main can exit with a status without skipping them.
-func run() error {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
+func run(logger *slog.Logger) error {
 	// A missing .env is fine (a container gets its variables from compose).
 	if err := godotenv.Load(".env"); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("loading .env: %w", err)
@@ -82,17 +81,22 @@ func run() error {
 		Addr:              ":" + os.Getenv("HTTP_PORT"),
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
+	errCh := make(chan error, 1)
 	go func() {
 		logger.Info("starting server", "addr", srv.Addr)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Error("server failed", "err", err)
-			stop()
-		}
+		errCh <- srv.ListenAndServe()
 	}()
 
-	<-ctx.Done()
+	select {
+	case err := <-errCh:
+		return fmt.Errorf("listen: %w", err)
+	case <-ctx.Done():
+	}
 	logger.Info("shutting down server")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
