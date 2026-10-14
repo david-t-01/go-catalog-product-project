@@ -50,7 +50,7 @@ Database seed
   for f in sql/*.sql; do docker compose exec -T postgres psql -q -U postgres -d challenge -v ON_ERROR_STOP=1 < "$f"; done
   ```
 
-- Seed with the Go command inside a throwaway container on the compose network (uses the same `cmd/seed`; needs the `POSTGRES_HOST` variable, available from the categories-model branch on):
+- Seed with the Go command inside a throwaway container on the compose network (uses the same `cmd/seed`):
 
   ```bash
   docker run --rm --network go-catalog-product-project_default -v "$PWD":/src -w /src \
@@ -75,6 +75,33 @@ Database seed
 - Import `postman/go-catalog.postman_collection.json` and `postman/local.postman_environment.json` into Postman; one folder per branch, every request asserts status and body.
 - `curl -s localhost:8484/catalog | jq .` for a quick look from the terminal.
 
+## Endpoints
+
+| Method | Path | Query / body | Responses |
+| --- | --- | --- | --- |
+| GET | `/healthz` | - | `200 {"status":"ok"}` |
+| GET | `/catalog` | `offset` (default 0, negative clamped to 0), `limit` (default 10, clamped to 1..100), `category=<CODE>` (exact), `price_less_than=<decimal>` (strict) | `200 {"products":[{"code","price","category":{"code","name"}}],"total","offset","limit"}`; `400 {"error":"invalid limit: must be an integer"}` |
+| GET | `/catalog/{code}` | - | `200 {"code","price","category","variants":[{"name","sku","price"}]}` (variants without a price inherit the product price); `404 {"error":"product not found"}` |
+| GET | `/categories` | - | `200 {"categories":[{"code","name"}]}` |
+| POST | `/categories` | `{"code":"BAGS","name":"Bags"}` (trimmed; code <= 32, name <= 256) | `201 {"code","name"}`; `400 {"error":"code is required"}` / `{"error":"invalid JSON body"}`; `409 {"error":"category code already exists"}` |
+
+Examples: `curl 'localhost:8484/catalog?category=SHOES&limit=5'`, `curl -X POST localhost:8484/categories -d '{"code":"BAGS","name":"Bags"}'`.
+
 ## API docs
 
 Interactive OpenAPI documentation is served by the API itself at `http://localhost:8484/docs/` (spec at `/docs/openapi.yaml`, source in `app/apidocs/static/openapi.yaml`). The Swagger UI assets are vendored; refresh them with `make docs-ui`.
+
+## Decisions
+
+- Three layers per feature (`handler -> service -> repository`). Interfaces are declared by their consumers (`catalog.Catalog`, `catalog.ProductsRepository`, `categories.Categories`, `categories.Repository`) and constructors return concrete types.
+- Handlers parse strings and map errors to HTTP once; services own the rules (pagination defaults and clamping, trimming, validation, variant price inheritance); repositories own the GORM queries.
+- Out-of-range `offset`/`limit` are clamped; non-numeric values are rejected with 400. The category filter matches the code exactly (case-sensitive).
+- Category `id` is never exposed. Variant prices are `decimal.NullDecimal`: NULL inherits the product price, an explicit `0.00` is kept.
+- Errors are sentinels (`ErrNotFound`, `ErrConflict`, `ValidationError`) wrapped with `%w`; GORM `TranslateError` turns duplicate keys into `ErrConflict`.
+- Unit tests use mockery v3 mocks in black-box `_test` packages; repositories are tested with `make test-integration` against the compose database.
+- The API image is opt-in: `make docker-up` starts only Postgres, `make docker-up-app` the full stack. The container reaches the database through `POSTGRES_HOST`.
+
+## Development
+
+- `make lint`: golangci-lint v2 (pinned as a Go tool). `make mocks`: regenerate mocks from `.mockery.yml`. `make test-integration`: repository tests (needs `make docker-up` and `make seed`).
+- `make docker-build`, `make docker-up-app`, `make docker-down`, `make docs-ui`.

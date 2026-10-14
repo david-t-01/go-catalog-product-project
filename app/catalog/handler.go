@@ -3,6 +3,7 @@ package catalog
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -43,23 +44,25 @@ func (h *Handler) HandleList(w http.ResponseWriter, r *http.Request) {
 	api.OKResponse(w, res)
 }
 
+func (h *Handler) HandleDetails(w http.ResponseWriter, r *http.Request) {
+	res, err := h.svc.Details(r.Context(), r.PathValue("code"))
+	if err != nil {
+		h.writeError(w, r, "getting product", err)
+		return
+	}
+	api.OKResponse(w, res)
+}
+
 // Defaults apply only when a parameter is absent; the service clamps the values.
 func parseListQuery(v url.Values) (ListQuery, error) {
-	q := ListQuery{Limit: DefaultLimit, CategoryCode: v.Get("category")}
+	q := ListQuery{CategoryCode: v.Get("category")}
 
-	if s := v.Get("offset"); s != "" {
-		n, err := strconv.Atoi(s)
-		if err != nil {
-			return ListQuery{}, errors.New("invalid offset: must be an integer")
-		}
-		q.Offset = n
+	var err error
+	if q.Offset, err = intParam(v, "offset", 0); err != nil {
+		return ListQuery{}, err
 	}
-	if s := v.Get("limit"); s != "" {
-		n, err := strconv.Atoi(s)
-		if err != nil {
-			return ListQuery{}, errors.New("invalid limit: must be an integer")
-		}
-		q.Limit = n
+	if q.Limit, err = intParam(v, "limit", DefaultLimit); err != nil {
+		return ListQuery{}, err
 	}
 	if s := v.Get("price_less_than"); s != "" {
 		d, err := decimal.NewFromString(s)
@@ -71,25 +74,24 @@ func parseListQuery(v url.Values) (ListQuery, error) {
 	return q, nil
 }
 
-// Internal error details are logged here and never reach the response body.
-func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, op string, err error) {
-	var ve *models.ValidationError
-	switch {
-	case errors.As(err, &ve):
-		api.ErrorResponse(w, http.StatusBadRequest, ve.Error())
-	case errors.Is(err, models.ErrNotFound):
-		api.ErrorResponse(w, http.StatusNotFound, "product not found")
-	default:
-		h.log.ErrorContext(r.Context(), op, "err", err)
-		api.ErrorResponse(w, http.StatusInternalServerError, "internal error")
+func intParam(v url.Values, name string, def int) (int, error) {
+	s := v.Get(name)
+	if s == "" {
+		return def, nil
 	}
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, fmt.Errorf("invalid %s: must be an integer", name)
+	}
+	return n, nil
 }
 
-func (h *Handler) HandleDetails(w http.ResponseWriter, r *http.Request) {
-	res, err := h.svc.Details(r.Context(), r.PathValue("code"))
-	if err != nil {
-		h.writeError(w, r, "getting product", err)
+// Internal error details are logged here and never reach the response body.
+func (h *Handler) writeError(w http.ResponseWriter, r *http.Request, op string, err error) {
+	if errors.Is(err, models.ErrNotFound) {
+		api.ErrorResponse(w, http.StatusNotFound, "product not found")
 		return
 	}
-	api.OKResponse(w, res)
+	h.log.ErrorContext(r.Context(), op, "err", err)
+	api.ErrorResponse(w, http.StatusInternalServerError, "internal error")
 }

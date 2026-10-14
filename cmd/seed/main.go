@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -20,12 +19,10 @@ func main() {
 }
 
 func run() error {
-	// Load environment variables from .env file
 	if err := godotenv.Load(".env"); err != nil {
 		return fmt.Errorf("loading .env file: %w", err)
 	}
 
-	// Initialize database connection
 	db, closeDB, err := database.New(
 		os.Getenv("POSTGRES_HOST"),
 		os.Getenv("POSTGRES_USER"),
@@ -34,40 +31,32 @@ func run() error {
 		os.Getenv("POSTGRES_PORT"),
 	)
 	if err != nil {
-		return fmt.Errorf("database: %w", err)
+		return err
 	}
 	defer func() { _ = closeDB() }()
 
 	dir := os.Getenv("POSTGRES_SQL_DIR")
-	files, err := os.ReadDir(dir)
+	entries, err := os.ReadDir(dir) // sorted by file name, so 000-truncate runs first
 	if err != nil {
 		return fmt.Errorf("reading directory: %w", err)
 	}
 
-	var sqlFiles []os.DirEntry
-	for _, file := range files {
-		if !file.IsDir() && strings.HasSuffix(file.Name(), ".sql") {
-			sqlFiles = append(sqlFiles, file)
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
+			continue
 		}
-	}
-	sort.Slice(sqlFiles, func(i, j int) bool {
-		return sqlFiles[i].Name() < sqlFiles[j].Name()
-	})
-
-	for _, file := range sqlFiles {
-		path := filepath.Join(dir, file.Name())
-
+		path := filepath.Join(dir, entry.Name())
 		content, err := os.ReadFile(path)
 		if err != nil {
-			log.Printf("reading file %s failed: %v", file.Name(), err)
+			return fmt.Errorf("reading %s: %w", entry.Name(), err)
 		}
 
 		sql := string(content)
 		if err := db.Exec(sql).Error; err != nil {
-			return fmt.Errorf("executing %s: %w", file.Name(), err)
+			return fmt.Errorf("executing %s: %w", entry.Name(), err)
 		}
 
-		log.Printf("Executed %s successfully\n", file.Name())
+		log.Printf("Executed %s successfully\n", entry.Name())
 	}
 	return nil
 }

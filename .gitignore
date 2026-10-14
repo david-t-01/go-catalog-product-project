@@ -1,3 +1,5 @@
 /vendor
 coverage.out
 .idea/
+.env*
+!.env.*
