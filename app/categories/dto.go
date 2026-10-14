@@ -11,6 +11,6 @@ type ListResponse struct {
 
 // CreateInput is the untrimmed input of a create request.
 type CreateInput struct {
-	Code string
-	Name string
+	Code string `json:"code"`
+	Name string `json:"name"`
 }

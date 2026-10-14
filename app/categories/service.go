@@ -34,7 +34,7 @@ func (s *Service) List(ctx context.Context) ([]Category, error) {
 	}
 	out := make([]Category, 0, len(items))
 	for _, c := range items {
-		out = append(out, Category{Code: c.Code, Name: c.Name})
+		out = append(out, toCategory(c))
 	}
 	return out, nil
 }
@@ -58,5 +58,9 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (Category, error) 
 	if err := s.repo.Create(ctx, c); err != nil {
 		return Category{}, fmt.Errorf("creating category: %w", err)
 	}
-	return Category{Code: c.Code, Name: c.Name}, nil
+	return toCategory(*c), nil
+}
+
+func toCategory(c models.Category) Category {
+	return Category{Code: c.Code, Name: c.Name}
 }

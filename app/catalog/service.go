@@ -58,14 +58,6 @@ func (s *Service) List(ctx context.Context, q ListQuery) (ListResult, error) {
 	return ListResult{Products: products, Total: total, Offset: page.Offset, Limit: page.Limit}, nil
 }
 
-func toCategory(c models.Category) Category {
-	return Category{Code: c.Code, Name: c.Name}
-}
-
-func toProduct(p models.Product) Product {
-	return Product{Code: p.Code, Price: p.Price.InexactFloat64(), Category: toCategory(p.Category)}
-}
-
 func (s *Service) Details(ctx context.Context, code string) (ProductDetails, error) {
 	p, err := s.repo.GetByCode(ctx, code)
 	if err != nil {
@@ -74,10 +66,27 @@ func (s *Service) Details(ctx context.Context, code string) (ProductDetails, err
 	return toDetails(p), nil
 }
 
+func toCategory(c models.Category) Category {
+	return Category{Code: c.Code, Name: c.Name}
+}
+
+func toProduct(p models.Product) Product {
+	return Product{Code: p.Code, Price: p.Price.InexactFloat64(), Category: toCategory(p.Category)}
+}
+
 func toDetails(p *models.Product) ProductDetails {
 	variants := make([]Variant, 0, len(p.Variants))
 	for _, v := range p.Variants {
-		variants = append(variants, Variant{Name: v.Name, SKU: v.SKU, Price: v.EffectivePrice(p.Price).InexactFloat64()})
+		variants = append(variants, Variant{
+			Name:  v.Name,
+			SKU:   v.SKU,
+			Price: v.EffectivePrice(p.Price).InexactFloat64(),
+		})
 	}
-	return ProductDetails{Code: p.Code, Price: p.Price.InexactFloat64(), Category: toCategory(p.Category), Variants: variants}
+	return ProductDetails{
+		Code:     p.Code,
+		Price:    p.Price.InexactFloat64(),
+		Category: toCategory(p.Category),
+		Variants: variants,
+	}
 }

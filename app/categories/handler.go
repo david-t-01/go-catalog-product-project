@@ -27,11 +27,6 @@ func NewHandler(svc Categories, log *slog.Logger) *Handler {
 	return &Handler{svc: svc, log: log}
 }
 
-type createRequest struct {
-	Code string `json:"code"`
-	Name string `json:"name"`
-}
-
 func (h *Handler) HandleList(w http.ResponseWriter, r *http.Request) {
 	list, err := h.svc.List(r.Context())
 	if err != nil {
@@ -42,13 +37,13 @@ func (h *Handler) HandleList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
-	var req createRequest
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes)).Decode(&req); err != nil {
+	var in CreateInput
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes)).Decode(&in); err != nil {
 		api.ErrorResponse(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
 
-	c, err := h.svc.Create(r.Context(), CreateInput(req))
+	c, err := h.svc.Create(r.Context(), in)
 	if err != nil {
 		h.writeError(w, r, "creating category", err)
 		return
