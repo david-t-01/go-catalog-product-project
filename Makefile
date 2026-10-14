@@ -15,3 +15,12 @@ docker-up ::
 
 docker-down ::
 	docker compose down
+
+lint ::
+	@go tool golangci-lint run ./...
+
+mocks ::
+	@go tool mockery
+
+test-integration ::
+	@go test -count=1 -race -tags integration ./models/...
