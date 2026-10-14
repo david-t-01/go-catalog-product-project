@@ -1,0 +1,28 @@
+version: "2"
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - errorlint
+    - gocritic
+    - gosec
+    - misspell
+    - noctx
+    - revive
+    - sqlclosecheck
+  exclusions:
+    rules:
+      # provided challenge test file, not ours to edit
+      - path: app/api/response_test\.go
+        linters: [misspell]
+      # the seed command reads the local sql/ files by design
+      - path: cmd/seed/
+        linters: [gosec]
+        text: "G(304|703|706)"
+      # comments only on large or non-obvious logic, never on every exported symbol
+      - linters: [revive]
+        text: "package-comments|exported .* should have comment"
+formatters:
+  enable:
+    - gofmt
+    - goimports
