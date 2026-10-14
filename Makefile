@@ -14,7 +14,13 @@ docker-up ::
 	docker compose up -d
 
 docker-down ::
-	docker compose down
+	docker compose --profile app down
+
+docker-build ::
+	docker build -t go-catalog-api .
+
+docker-up-app ::
+	docker compose --profile app up --build -d
 
 lint ::
 	@go tool golangci-lint run ./...

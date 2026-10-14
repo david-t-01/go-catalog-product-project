@@ -13,6 +13,8 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"github.com/david-t-01/go-catalog-product-project/app/api"
+	"github.com/david-t-01/go-catalog-product-project/app/apidocs"
 	"github.com/david-t-01/go-catalog-product-project/app/catalog"
 	"github.com/david-t-01/go-catalog-product-project/app/categories"
 	"github.com/david-t-01/go-catalog-product-project/app/database"
@@ -67,10 +69,14 @@ func run() error {
 
 	// Routes
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+		api.OKResponse(w, map[string]string{"status": "ok"})
+	})
 	mux.HandleFunc("GET /catalog", catalogHandler.HandleList)
 	mux.HandleFunc("GET /catalog/{code}", catalogHandler.HandleDetails)
 	mux.HandleFunc("GET /categories", categoriesHandler.HandleList)
 	mux.HandleFunc("POST /categories", categoriesHandler.HandleCreate)
+	apidocs.Register(mux)
 
 	srv := &http.Server{
 		Addr:              ":" + os.Getenv("HTTP_PORT"),
