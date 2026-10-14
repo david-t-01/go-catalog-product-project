@@ -1,0 +1,149 @@
+openapi: 3.0.3
+info:
+  title: go-catalog API
+  version: 1.0.0
+  description: Products catalog with categories and variants.
+servers:
+  - url: /
+paths:
+  /healthz:
+    get:
+      summary: Liveness check
+      responses:
+        "200":
+          description: Process is up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+  /catalog:
+    get:
+      summary: List products
+      parameters:
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 }, description: Negative values are clamped to 0 }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 10 }, description: Clamped to 1..100 }
+        - { name: category, in: query, schema: { type: string, example: SHOES }, description: Exact category code (case-sensitive) }
+        - { name: price_less_than, in: query, schema: { type: string, format: decimal, example: "10.00" }, description: Strictly lower price }
+      responses:
+        "200":
+          description: One page of products
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ListResult" }
+        "400":
+          description: Invalid query parameter
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: "invalid limit: must be an integer" }
+  /catalog/{code}:
+    get:
+      summary: Product details with variants
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string, example: PROD001 } }
+      responses:
+        "200":
+          description: Product with category and variants; variants without a price inherit the product price
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProductDetails" }
+        "404":
+          description: Unknown product code
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: product not found }
+  /categories:
+    get:
+      summary: List categories
+      responses:
+        "200":
+          description: All categories in creation order
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items: { $ref: "#/components/schemas/Category" }
+    post:
+      summary: Create a category
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateCategory" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Category" }
+        "400":
+          description: Invalid JSON body or validation failure
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: code is required }
+        "409":
+          description: Category code already exists
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: category code already exists }
+components:
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    Category:
+      type: object
+      required: [code, name]
+      properties:
+        code: { type: string, example: CLOTHING }
+        name: { type: string, example: Clothing }
+    CreateCategory:
+      type: object
+      required: [code, name]
+      properties:
+        code: { type: string, maxLength: 32, example: BAGS }
+        name: { type: string, maxLength: 256, example: Bags }
+    Product:
+      type: object
+      required: [code, price, category]
+      properties:
+        code: { type: string, example: PROD001 }
+        price: { type: number, format: double, example: 10.99 }
+        category: { $ref: "#/components/schemas/Category" }
+    Variant:
+      type: object
+      required: [name, sku, price]
+      properties:
+        name: { type: string, example: Variant A }
+        sku: { type: string, example: SKU001A }
+        price: { type: number, format: double, example: 11.99 }
+    ProductDetails:
+      type: object
+      required: [code, price, category, variants]
+      properties:
+        code: { type: string, example: PROD001 }
+        price: { type: number, format: double, example: 10.99 }
+        category: { $ref: "#/components/schemas/Category" }
+        variants:
+          type: array
+          items: { $ref: "#/components/schemas/Variant" }
+    ListResult:
+      type: object
+      required: [products, total, offset, limit]
+      properties:
+        products:
+          type: array
+          items: { $ref: "#/components/schemas/Product" }
+        total: { type: integer, example: 8 }
+        offset: { type: integer, example: 0 }
+        limit: { type: integer, example: 10 }
