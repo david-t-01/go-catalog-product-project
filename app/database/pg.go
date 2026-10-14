@@ -2,24 +2,24 @@ package database
 
 import (
 	"fmt"
-	"log"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-func New(user, password, dbname, port string) (db *gorm.DB, closeDB func() error) {
-	dsn := fmt.Sprintf("postgres://%s:%s@localhost:%s/%s?sslmode=disable", user, password, port, dbname)
+func New(host, user, password, dbname, port string) (*gorm.DB, func() error, error) {
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", user, password, host, port, dbname)
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	// TranslateError turns driver duplicate-key errors into gorm.ErrDuplicatedKey.
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{TranslateError: true})
 	if err != nil {
-		log.Fatalf("failed to connect database: %s", err)
+		return nil, nil, fmt.Errorf("connecting to database: %w", err)
 	}
 
 	sqlDB, err := db.DB()
 	if err != nil {
-		log.Fatalf("Failed to get database connection: %s", err)
+		return nil, nil, fmt.Errorf("getting database handle: %w", err)
 	}
 
-	return db, sqlDB.Close
+	return db, sqlDB.Close, nil
 }

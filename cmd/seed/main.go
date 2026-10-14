@@ -26,12 +26,16 @@ func run() error {
 	}
 
 	// Initialize database connection
-	db, closeDB := database.New(
+	db, closeDB, err := database.New(
+		os.Getenv("POSTGRES_HOST"),
 		os.Getenv("POSTGRES_USER"),
 		os.Getenv("POSTGRES_PASSWORD"),
 		os.Getenv("POSTGRES_DB"),
 		os.Getenv("POSTGRES_PORT"),
 	)
+	if err != nil {
+		return fmt.Errorf("database: %w", err)
+	}
 	defer func() { _ = closeDB() }()
 
 	dir := os.Getenv("POSTGRES_SQL_DIR")
